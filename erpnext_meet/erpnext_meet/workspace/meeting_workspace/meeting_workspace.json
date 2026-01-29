@@ -1,0 +1,37 @@
+{
+    "charts": [],
+    "content": "[{\"id\":\"header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Meeting Workspace</span>\",\"col\":12}},{\"id\":\"card1\",\"type\":\"card\",\"data\":{\"card_name\":\"Meetings\",\"col\":4}}]",
+    "doctype": "Workspace",
+    "icon": "video",
+    "label": "Erpnext Meeting",
+    "links": [
+        {
+            "label": "Meetings",
+            "type": "Card Break"
+        },
+        {
+            "label": "Meeting List",
+            "link_to": "Meeting",
+            "link_type": "DocType",
+            "type": "Link"
+        },
+        {
+            "label": "Settings",
+            "link_to": "Meeting Settings",
+            "link_type": "DocType",
+            "type": "Link"
+        }
+    ],
+    "module": "erpnext_meet",
+    "name": "Meeting Workspace",
+    "public": 1,
+    "roles": [
+        {
+            "role": "System Manager"
+        },
+        {
+            "role": "All"
+        }
+    ],
+    "title": "Meeting Workspace"
+}

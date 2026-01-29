@@ -1,0 +1,116 @@
+{
+    "actions": [],
+    "autoname": "format:MEET-{YYYY}-{MM}-{#####}",
+    "creation": "2024-05-22 10:00:00.000000",
+    "doctype": "DocType",
+    "engine": "InnoDB",
+    "field_order": [
+        "status",
+        "host",
+        "start_time",
+        "end_time",
+        "column_break_1",
+        "session_id",
+        "reference_doctype",
+        "reference_docname",
+        "section_break_participants",
+        "participants"
+    ],
+    "fields": [
+        {
+            "default": "Active",
+            "fieldname": "status",
+            "fieldtype": "Select",
+            "label": "Status",
+            "options": "Active\nWaiting\nEnded"
+        },
+        {
+            "fieldname": "event_ref",
+            "fieldtype": "Link",
+            "hidden": 1,
+            "label": "Event Reference",
+            "options": "Event",
+            "read_only": 1
+        },
+        {
+            "fieldname": "host",
+            "fieldtype": "Link",
+            "label": "Host",
+            "options": "User"
+        },
+        {
+            "fieldname": "start_time",
+            "fieldtype": "Datetime",
+            "label": "Start Time"
+        },
+        {
+            "fieldname": "end_time",
+            "fieldtype": "Datetime",
+            "label": "End Time"
+        },
+        {
+            "fieldname": "column_break_1",
+            "fieldtype": "Column Break"
+        },
+        {
+            "fieldname": "session_id",
+            "fieldtype": "Data",
+            "label": "Session ID",
+            "unique": 1
+        },
+        {
+            "fieldname": "reference_doctype",
+            "fieldtype": "Link",
+            "label": "Reference DocType",
+            "options": "DocType"
+        },
+        {
+            "fieldname": "reference_docname",
+            "fieldtype": "Dynamic Link",
+            "label": "Reference Name",
+            "options": "reference_doctype"
+        },
+        {
+            "fieldname": "section_break_participants",
+            "fieldtype": "Section Break",
+            "label": "Participants"
+        },
+        {
+            "fieldname": "participants",
+            "fieldtype": "Table",
+            "label": "Participants",
+            "options": "Meeting Participant"
+        }
+    ],
+    "issingle": 0,
+    "links": [],
+    "modified": "2024-05-22 10:00:00.000000",
+    "modified_by": "Administrator",
+    "module": "erpnext_meet",
+    "name": "Meeting",
+    "owner": "Administrator",
+    "permissions": [
+        {
+            "create": 1,
+            "delete": 1,
+            "email": 1,
+            "print": 1,
+            "read": 1,
+            "role": "System Manager",
+            "share": 1,
+            "write": 1
+        },
+        {
+            "create": 1,
+            "email": 1,
+            "print": 1,
+            "read": 1,
+            "role": "All",
+            "share": 1,
+            "write": 1
+        }
+    ],
+    "sort_field": "modified",
+    "sort_order": "DESC",
+    "states": []
+}

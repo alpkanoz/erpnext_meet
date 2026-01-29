@@ -1,1 +1,1 @@
-ERPNext Meet
+erpnext_meet

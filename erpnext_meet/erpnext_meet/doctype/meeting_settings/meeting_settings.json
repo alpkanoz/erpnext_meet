@@ -1,0 +1,172 @@
+{
+    "actions": [],
+    "creation": "2024-05-22 10:00:00.000000",
+    "doctype": "DocType",
+    "engine": "InnoDB",
+    "field_order": [
+        "enable_chat",
+        "sb_jitsi",
+        "jitsi_domain",
+        "app_id",
+        "app_secret",
+        "webhook_token",
+        "sb_general_options",
+        "app_name",
+        "default_language",
+        "resolution",
+        "sb_policies",
+        "start_audio_muted",
+        "start_video_muted",
+        "require_display_name",
+        "prejoin_page_enabled",
+        "sb_branding",
+        "default_background",
+        "show_brand_watermark",
+        "brand_watermark_link",
+        "show_jitsi_watermark",
+        "toolbar_buttons"
+    ],
+    "fields": [
+        {
+            "default": "0",
+            "fieldname": "enable_chat",
+            "fieldtype": "Check",
+            "label": "Enable Video Meetings"
+        },
+        {
+            "fieldname": "sb_jitsi",
+            "fieldtype": "Section Break",
+            "label": "Jitsi Configuration"
+        },
+        {
+            "default": "meet.jit.si",
+            "fieldname": "jitsi_domain",
+            "fieldtype": "Data",
+            "label": "Jitsi Domain",
+            "reqd": 1
+        },
+        {
+            "fieldname": "app_id",
+            "fieldtype": "Data",
+            "label": "App ID"
+        },
+        {
+            "fieldname": "app_secret",
+            "fieldtype": "Password",
+            "label": "App Secret"
+        },
+        {
+            "fieldname": "webhook_token",
+            "fieldtype": "Data",
+            "label": "Webhook Secret Token"
+        },
+        {
+            "fieldname": "sb_general_options",
+            "fieldtype": "Section Break",
+            "label": "General Options"
+        },
+        {
+            "default": "Jitsi Meet",
+            "fieldname": "app_name",
+            "fieldtype": "Data",
+            "label": "App Name"
+        },
+        {
+            "default": "en",
+            "fieldname": "default_language",
+            "fieldtype": "Select",
+            "label": "Default Language",
+            "options": "en\ntr\nde\nfr\nes"
+        },
+        {
+            "default": "720",
+            "fieldname": "resolution",
+            "fieldtype": "Int",
+            "label": "Resolution Height (e.g. 720)"
+        },
+        {
+            "fieldname": "sb_policies",
+            "fieldtype": "Section Break",
+            "label": "Policies"
+        },
+        {
+            "default": "0",
+            "fieldname": "start_audio_muted",
+            "fieldtype": "Check",
+            "label": "Start Audio Muted"
+        },
+        {
+            "default": "0",
+            "fieldname": "start_video_muted",
+            "fieldtype": "Check",
+            "label": "Start Video Muted"
+        },
+        {
+            "default": "0",
+            "fieldname": "require_display_name",
+            "fieldtype": "Check",
+            "label": "Require Display Name"
+        },
+        {
+            "default": "1",
+            "fieldname": "prejoin_page_enabled",
+            "fieldtype": "Check",
+            "label": "Enable Prejoin Page"
+        },
+        {
+            "fieldname": "sb_branding",
+            "fieldtype": "Section Break",
+            "label": "Branding & UI"
+        },
+        {
+            "default": "#040404",
+            "fieldname": "default_background",
+            "fieldtype": "Color",
+            "label": "Default Background Color"
+        },
+        {
+            "default": "0",
+            "fieldname": "show_brand_watermark",
+            "fieldtype": "Check",
+            "label": "Show Brand Watermark"
+        },
+        {
+            "fieldname": "brand_watermark_link",
+            "fieldtype": "Data",
+            "label": "Brand Watermark Link"
+        },
+        {
+            "default": "1",
+            "fieldname": "show_jitsi_watermark",
+            "fieldtype": "Check",
+            "label": "Show Jitsi Watermark"
+        },
+        {
+            "fieldname": "toolbar_buttons",
+            "fieldtype": "Small Text",
+            "label": "Toolbar Buttons (Comma Separated)"
+        }
+    ],
+    "issingle": 1,
+    "links": [],
+    "modified": "2024-05-22 10:00:00.000000",
+    "modified_by": "Administrator",
+    "module": "erpnext_meet",
+    "name": "Meeting Settings",
+    "owner": "Administrator",
+    "permissions": [
+        {
+            "create": 1,
+            "delete": 1,
+            "email": 1,
+            "print": 1,
+            "read": 1,
+            "role": "System Manager",
+            "share": 1,
+            "write": 1
+        }
+    ],
+    "sort_field": "modified",
+    "sort_order": "DESC",
+    "states": []
+}
