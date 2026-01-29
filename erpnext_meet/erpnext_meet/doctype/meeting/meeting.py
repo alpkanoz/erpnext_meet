@@ -92,7 +92,7 @@ class Meeting(Document):
             added_users = list(new_participants - old_participants)
             
             if added_users:
-                import erpnext_meet.erpnext_meet.erpnext_meet.api as meeting_api
+                import erpnext_meet.erpnext_meet.api as meeting_api
                 
                 room_name = f"Meet-{self.reference_doctype or 'Instant'}-{self.reference_docname or 'Meeting'}-{self.session_id}".replace(" ", "_")
                 if not self.reference_doctype:

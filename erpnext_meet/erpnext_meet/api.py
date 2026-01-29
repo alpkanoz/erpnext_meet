@@ -47,7 +47,7 @@ def create_room(doctype, docname):
     if not domain_url.startswith("http"):
         domain_url = f"https://{domain_url}"
 
-    join_link = frappe.utils.get_url(f"/api/method/erpnext_meet.erpnext_meet.erpnext_meet.api.join_room?room_name={room_name}")
+    join_link = frappe.utils.get_url(f"/api/method/erpnext_meet.erpnext_meet.api.join_room?room_name={room_name}")
     
     return {
         "room_name": room_name,
@@ -75,6 +75,9 @@ def generate_jitsi_jwt(settings, room_name, user_email, is_moderator=False):
     if not settings.app_id or not settings.get_password("app_secret"):
         return None
 
+    # Fix: 'sub' should typically be the domain
+    tenant_domain = settings.jitsi_domain or "meet.jit.si"
+
     payload = {
         "context": {
             "user": {
@@ -92,8 +95,8 @@ def generate_jitsi_jwt(settings, room_name, user_email, is_moderator=False):
         },
         "aud": "jitsi",
         "iss": settings.app_id,
-        "sub": "meet.jitsi",
-        "room": room_name,
+        "sub": tenant_domain,
+        "room": "*", # Using wildcard to avoid regex mismatches
         "moderator": is_moderator,
         "affiliation": "owner" if is_moderator else "member",
         "exp": int(time.time() + 7200)
@@ -184,7 +187,7 @@ def invite_users(users, room_name, doctype, docname):
     if not users:
         return
 
-    join_url = frappe.utils.get_url(f"/api/method/erpnext_meet.erpnext_meet.erpnext_meet.api.join_room?room_name={room_name}")
+    join_url = frappe.utils.get_url(f"/api/method/erpnext_meet.erpnext_meet.api.join_room?room_name={room_name}")
 
     for user in users:
         if user == frappe.session.user:

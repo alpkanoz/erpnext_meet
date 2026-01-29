@@ -1,5 +1,6 @@
 
 // Standard reliable way for Meeting DocType
+// Version 15 Fix applied
 frappe.ui.form.on("Meeting", {
     refresh: function (frm) {
         setup_video_button(frm);
@@ -32,7 +33,7 @@ function setup_video_button(frm) {
         if (status === "Pending" && frm.doc.host !== frappe.session.user) {
             let accept_btn = frm.add_custom_button('Accept', function () {
                 frappe.call({
-                    method: 'erpnext_meet.erpnext_meet.erpnext_meet.api.update_invitation_status',
+                    method: 'erpnext_meet.erpnext_meet.api.update_invitation_status',
                     args: { room_name: room_name, status: 'Accepted' },
                     callback: function (r) {
                         if (r.message) {
@@ -47,7 +48,7 @@ function setup_video_button(frm) {
             let reject_btn = frm.add_custom_button('Reject', function () {
                 frappe.confirm("Are you sure you want to reject this meeting invite?", () => {
                     frappe.call({
-                        method: 'erpnext_meet.erpnext_meet.erpnext_meet.api.update_invitation_status',
+                        method: 'erpnext_meet.erpnext_meet.api.update_invitation_status',
                         args: { room_name: room_name, status: 'Rejected' },
                         callback: function (r) {
                             if (r.message) {
@@ -75,7 +76,7 @@ function setup_video_button(frm) {
             frm.add_custom_button('End Meeting', function () {
                 frappe.confirm('End this meeting?', () => {
                     frappe.call({
-                        method: 'erpnext_meet.erpnext_meet.erpnext_meet.api.end_meeting',
+                        method: 'erpnext_meet.erpnext_meet.api.end_meeting',
                         args: { room_name: room_name },
                         callback: function () {
                             frm.reload_doc();
@@ -88,7 +89,7 @@ function setup_video_button(frm) {
 }
 
 function join_meeting_direct(room_name) {
-    let url = frappe.urllib.get_full_url("/api/method/erpnext_meet.erpnext_meet.erpnext_meet.api.join_room?room_name=" + room_name);
+    let url = frappe.urllib.get_full_url("/api/method/erpnext_meet.erpnext_meet.api.join_room?room_name=" + room_name);
     window.open(url, '_blank');
 }
 
@@ -180,7 +181,7 @@ function start_meeting() {
 
 function create_and_join_room(invited_users) {
     frappe.call({
-        method: "erpnext_meet.erpnext_meet.erpnext_meet.api.create_room",
+        method: "erpnext_meet.erpnext_meet.api.create_room",
         args: {
             doctype: cur_frm ? cur_frm.doctype : null,
             docname: cur_frm ? cur_frm.docname : null
@@ -190,7 +191,7 @@ function create_and_join_room(invited_users) {
                 let room_data = r.message;
                 if (invited_users && invited_users.length > 0) {
                     frappe.call({
-                        method: "erpnext_meet.erpnext_meet.erpnext_meet.api.invite_users",
+                        method: "erpnext_meet.erpnext_meet.api.invite_users",
                         args: {
                             users: invited_users,
                             room_name: room_data.room_name,

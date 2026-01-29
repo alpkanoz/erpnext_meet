@@ -5,7 +5,7 @@ frappe.ui.form.on('Meeting Settings', {
     refresh: function (frm) {
         frm.add_custom_button('Generate Config Files', function () {
             frappe.call({
-                method: 'erpnext_meet.erpnext_meet.erpnext_meet.utils.config_generator.generate_jitsi_config',
+                method: 'erpnext_meet.erpnext_meet.utils.config_generator.generate_jitsi_config',
                 callback: function (r) {
                     if (r.message) {
                         download_file("config.js", r.message["config.js"]);
