@@ -8,7 +8,12 @@ app_license = "mit"
 # Apps
 # ------------------
 
+# Required Apps
 # required_apps = []
+
+# Note: The user will provide a custom repository URL for the forked 'jitsi_meet' app.
+# This app is required for full functionality.
+
 
 # Each item in the list will be shown as an app in the apps page
 # add_to_apps_screen = [

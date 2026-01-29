@@ -10,13 +10,16 @@ import uuid
 def create_room(doctype, docname):
     """
     Creates a new Jitsi room/session for the given document.
+    Returns: { "room_url": "...", "session_name": "..." }
     """
     settings = frappe.get_single("Meeting Settings")
-    if not settings.enable_integration:
+    if not settings.enable_chat:
         frappe.throw(_("Meeting integration is disabled."))
 
+    # Generate a unique session ID
     session_id = str(uuid.uuid4())[:8]
     
+    # Create Call Session Record
     session = frappe.get_doc({
         "doctype": "Meeting",
         "session_id": session_id,
@@ -27,6 +30,7 @@ def create_room(doctype, docname):
         "status": "Active"
     })
     
+    # Add host as participant
     session.append("participants", {
         "user": frappe.session.user,
         "invitation_status": "Accepted"
@@ -34,15 +38,19 @@ def create_room(doctype, docname):
     
     session.insert(ignore_permissions=True)
     
+    # Construct Jitsi URL
     domain = settings.jitsi_domain or "meet.jit.si"
+    # Room name format: Meet-DocType-DocName-SessionID (Sanitized)
     if doctype and docname:
         room_name = f"Meet-{doctype}-{docname}-{session_id}".replace(" ", "_")
     else:
         room_name = f"Meet-Instant-{session_id}"
     
+    token = None
     if settings.app_id and settings.app_secret:
+        # Default behavior for room creation: Creator gets moderator rights
         token = generate_jitsi_jwt(settings, room_name, frappe.session.user, is_moderator=True)
-    
+
     domain_url = domain
     if not domain_url.startswith("http"):
         domain_url = f"https://{domain_url}"
@@ -57,6 +65,10 @@ def create_room(doctype, docname):
 
 @frappe.whitelist()
 def generate_jitsi_jwt(settings, room_name, user_email, is_moderator=False):
+    """
+    Generates a JWT token for Jitsi Meet (SaaS or Self-hosted with auth).
+    Payload heavily depends on Jitsi configuration.
+    """
     user_avatar = ""
     user_name = "Guest"
     
@@ -65,18 +77,13 @@ def generate_jitsi_jwt(settings, room_name, user_email, is_moderator=False):
         user_name = user_doc.full_name
         user_avatar = user_doc.user_image or ""
     elif user_email:
-         user_name = user_email 
+         user_name = user_email # Fallback if email provided but no doc (unlikely for Guests)
     
+    # Guest Handling
     if not user_email:
          import uuid
-         user_email = f"guest-{str(uuid.uuid4())[:8]}"
-         user_name = "Guest"
-         
-    if not settings.app_id or not settings.get_password("app_secret"):
-        return None
-
-    # Fix: 'sub' should typically be the domain
-    tenant_domain = settings.jitsi_domain or "meet.jit.si"
+         user_email = f"guest-{str(uuid.uuid4())[:8]}" # Random ID for guest
+         user_name = "Guest" # Or let them set it in Jitsi UI if possible, but token usually overrides
 
     payload = {
         "context": {
@@ -95,14 +102,18 @@ def generate_jitsi_jwt(settings, room_name, user_email, is_moderator=False):
         },
         "aud": "jitsi",
         "iss": settings.app_id,
-        "sub": tenant_domain,
-        "room": "*", # Using wildcard to avoid regex mismatches
+        "sub": settings.jitsi_domain or "meet.jit.si",
+        "room": room_name,
         "moderator": is_moderator,
         "affiliation": "owner" if is_moderator else "member",
-        "exp": int(time.time() + 7200)
+        "exp": int(time.time() + 7200) # 2 hours
     }
     
+    # Encode
     encoded_jwt = jwt.encode(payload, settings.get_password("app_secret"), algorithm="HS256")
+    
+    # DEBUG LOG
+    frappe.log_error(title="Jitsi JWT Debug", message=f"User: {user_email}, Is Moderator: {is_moderator}, Payload: {payload}, Token: {encoded_jwt}")
     
     if isinstance(encoded_jwt, bytes):
         return encoded_jwt.decode('utf-8')
@@ -110,20 +121,33 @@ def generate_jitsi_jwt(settings, room_name, user_email, is_moderator=False):
 
 @frappe.whitelist(allow_guest=True)
 def join_room(room_name):
+    """
+    Generates a token for the current user and redirects to the Jitsi room.
+    Usage: /api/method/erpnext_meet.erpnext_meet.api.join_room?room_name=...
+    """
     if frappe.session.user == "Guest":
+        # Guest Access Logic
         is_guest = True
-        user_email = ""
+        user_email = "" # No email for guest
         is_moderator = False
+        
+        # We can implement token validation here if needed, but for now open for invited guests
+        # Validating existence of meeting is enough for basic security
+        pass
     else:
         is_guest = False
 
     settings = frappe.get_single("Meeting Settings")
     
+    # 1. GET MEETING DETAILS
+    # Extract session_id from room_name (Meet-{doc}-{name}-{session_id})
+    # OR Meet-Instant-{session_id}
     try:
         parts = room_name.rsplit("-", 1)
         if len(parts) >= 2:
             session_id = parts[1].split("?")[0]
             
+            # Fetch Host and Participants
             meeting = frappe.db.get_value("Meeting", 
                 {"session_id": session_id}, 
                 ["name", "status", "host"], 
@@ -133,16 +157,24 @@ def join_room(room_name):
             if not meeting:
                  frappe.throw(_("Meeting not found"), frappe.DoesNotExistError)
 
+            # 2. STRICT PARTICIPANT CHECK (Skip for Guests if desired, or validate token)
             if not is_guest:
+                # Allow if User is Host
                 is_host = (meeting.host == frappe.session.user)
+                
+                # Allow if User is in Participants List
                 is_participant = frappe.db.exists("Meeting Participant", {
                     "parent": meeting.name,
                     "user": frappe.session.user
                 })
                 
+                # DENY if neither
                 if not is_host and not is_participant:
                      frappe.throw(_("You are not invited to this meeting."), frappe.PermissionError)
 
+                # 3. DETERMINE MODERATOR STATUS
+                # STRICT CHECK: Only the recorded host can be moderator
+                # Allow joining if Active or Waiting
                 if meeting.status in ["Active", "Waiting"] and is_host:
                     is_moderator = True
                 elif meeting.status in ["Active", "Waiting"]:
@@ -150,6 +182,7 @@ def join_room(room_name):
                 else:
                      frappe.throw(_("Meeting is not active."), frappe.PermissionError)
             else:
+                 # Guest logic for meeting status
                  if meeting.status not in ["Active", "Waiting"]:
                       frappe.throw(_("Meeting is not active."), frappe.PermissionError)
 
@@ -161,6 +194,7 @@ def join_room(room_name):
 
     token = generate_jitsi_jwt(settings, room_name, frappe.session.user, is_moderator=is_moderator)
     
+    # Ensure protocol is present
     domain = settings.jitsi_domain
     if not domain.startswith("http"):
         domain = f"https://{domain}"
@@ -169,34 +203,74 @@ def join_room(room_name):
     if token:
         url += f"?jwt={token}"
     
+    frappe.log_error(title="Jitsi Join URL", message=f"User: {frappe.session.user}, URL: {url}")
+    
     frappe.local.response["type"] = "redirect"
     frappe.local.response["location"] = url
 
 @frappe.whitelist()
+def start_instant_meeting():
+    """
+    Creates a standalone meeting and redirects the user to it.
+    Link for Shortcuts: /api/method/erpnext_meet.erpnext_meet.api.start_instant_meeting
+    """
+    try:
+        room_data = create_room(None, None)
+        frappe.local.response["type"] = "redirect"
+        frappe.local.response["location"] = room_data["join_link"]
+    except Exception as e:
+        frappe.log_error(f"Instant Meeting Error: {str(e)}")
+        frappe.throw(_("Could not start instant meeting. Check logs."))
+
+@frappe.whitelist()
 def invite_users(users, room_name, doctype, docname):
+    """
+    Sends a System Notification to the selected users.
+    users: JSON string list of user emails OR list object OR single string
+    """
     import json
+
+    # Ensure users is a list
+    if hasattr(users, "decode"): # bytes
+        users = users.decode("utf-8")
+        
     if isinstance(users, str):
         try:
             users = json.loads(users)
-        except:
-             users = [users]
+        except (ValueError, TypeError):
+            if users.startswith("[") and users.endswith("]"):
+                 # Failed json string resembling list
+                 pass 
+            else:
+                 # Single user as string
+                 users = [users]
 
     if not isinstance(users, list):
-         users = [users] if users else []
+         if users:
+              users = [users]
+         else:
+              return
 
     if not users:
         return
 
+    settings = frappe.get_single("Meeting Settings")
+    domain = settings.jitsi_domain
+    if not domain.startswith("http"):
+        domain = f"https://{domain}"
+    
+    # We point them to the join_room endpoint so they get their own JWT
     join_url = frappe.utils.get_url(f"/api/method/erpnext_meet.erpnext_meet.api.join_room?room_name={room_name}")
 
     for user in users:
         if user == frappe.session.user:
             continue
             
+        # Grant Read Permission via Share
         frappe.share.add("Meeting", docname, user, read=1, write=0, share=0)
 
         doc = frappe.new_doc("Notification Log")
-        doc.subject = f"Meeting Invite: {doctype} {docname}"
+        doc.subject = f"Video Meeting Invite: {doctype} {docname}"
         doc.email_content = f"""
             <p>You have been invited to a video meeting.</p>
             <p><b>Reference:</b> {doctype} {docname}</p>
@@ -208,14 +282,57 @@ def invite_users(users, room_name, doctype, docname):
         doc.type = "Alert"
         doc.insert(ignore_permissions=True)
 
+        # Send Email
+        frappe.sendmail(
+            recipients=[user],
+            subject=f"Video Meeting Invite: {doctype} {docname}",
+            message=doc.email_content,
+            reference_doctype=doctype,
+            reference_name=docname
+        )
+
+@frappe.whitelist()
+def get_active_room(doctype, docname):
+    """
+    Checks if there is an active Meeting Session for this document.
+    Returns dict {room_name, host} if active, else None.
+    """
+    sessions = frappe.get_all("Meeting", 
+        filters={
+            "reference_doctype": doctype,
+            "reference_docname": docname,
+            "status": "Active"
+        },
+        fields=["session_id", "host"],
+        order_by="creation desc",
+        limit=1
+    )
+    
+    if sessions:
+        session = sessions[0]
+        # Must match create_room name generation
+        room_name = f"Meet-{doctype}-{docname}-{session.session_id}".replace(" ", "_")
+        return {
+            "room_name": room_name,
+            "host": session.host
+        }
+        
+    return None
+
 @frappe.whitelist()
 def end_meeting(room_name, status="Ended"):
+    """
+    Ends the meeting associated with the room_name.
+    Extracts session_id from room_name.
+    status: 'Ended' (default, for manual end) or 'Waiting' (for timeout logic)
+    """
     try:
+        # room_name format: Meet-{doctype}-{docname}-{session_id}
         parts = room_name.rsplit("-", 1)
         if len(parts) < 2:
             return
             
-        session_id = parts[1].split("?")[0]
+        session_id = parts[1].split("?")[0] # Safety split if query params exist
         
         frappe.db.sql("""
             UPDATE `tabMeeting`
@@ -231,6 +348,9 @@ def end_meeting(room_name, status="Ended"):
 
 @frappe.whitelist()
 def start_meeting(room_name):
+    """
+    Re-activates a meeting (Waiting -> Active).
+    """
     try:
         parts = room_name.rsplit("-", 1)
         if len(parts) < 2:
@@ -238,6 +358,7 @@ def start_meeting(room_name):
             
         session_id = parts[1].split("?")[0]
         
+        # Only update if current status is Waiting
         frappe.db.sql("""
             UPDATE `tabMeeting`
             SET status = 'Active', modified = NOW()
@@ -252,19 +373,28 @@ def start_meeting(room_name):
 
 @frappe.whitelist(allow_guest=True)
 def handle_jitsi_event(**kwargs):
+    """
+    Handles incoming webhooks from Jitsi Prosody server.
+    Expected Payload: { "event": "room_destroyed", "room": "...", "token": "..." }
+    """
     data = frappe.form_dict
+    
+    # 1. Validate Token
     settings = frappe.get_single("Meeting Settings")
     
     if not settings.webhook_token:
-        frappe.throw(_("Webhook Token is not configured"), frappe.PermissionError)
+        frappe.throw(_("Webhook Token is not configured in Meeting Settings"), frappe.PermissionError)
         
     if data.get("token") != settings.webhook_token:
          frappe.throw(_("Invalid Webhook Token"), frappe.PermissionError)
 
+    # 2. Process Event
     event_type = data.get("event")
     room_name = data.get("room")
     
     if event_type == "room_destroyed" and room_name:
+        # room_name format: Meet-{doctype}-{docname}-{session_id}
+        # Webhook event means everyone left -> set to Waiting (for timeout)
         end_meeting(room_name, status="Waiting")
         return {"status": "success", "message": f"Meeting ended for room {room_name}"}
     
@@ -276,6 +406,10 @@ def handle_jitsi_event(**kwargs):
 
 @frappe.whitelist()
 def update_invitation_status(room_name, status):
+    """
+    Updates the invitation status for the current user in the specified meeting.
+    status: 'Accepted' or 'Rejected'
+    """
     if status not in ["Accepted", "Rejected"]:
          frappe.throw(_("Invalid status"))
 
@@ -287,6 +421,7 @@ def update_invitation_status(room_name, status):
         
         meeting = frappe.get_doc("Meeting", {"session_id": session_id})
         
+        # Find participant row
         found = False
         for p in meeting.participants:
             if p.user == frappe.session.user:
@@ -303,3 +438,8 @@ def update_invitation_status(room_name, status):
     except Exception as e:
         frappe.log_error(f"RSVP Error: {str(e)}")
         return False
+
+@frappe.whitelist()
+def get_jitsi_domain():
+    settings = frappe.get_single("Meeting Settings")
+    return settings.jitsi_domain
