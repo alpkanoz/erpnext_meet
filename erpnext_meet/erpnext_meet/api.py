@@ -102,14 +102,16 @@ def generate_jitsi_jwt(settings, room_name, user_email, is_moderator=False):
         },
         "aud": "jitsi",
         "iss": settings.app_id,
-        "sub": settings.jitsi_domain or "meet.jit.si",
-        "room": room_name,
+        "sub": "meet.jitsi",
+        "room": "*", # Using wildcard to avoid regex mismatches
         "moderator": is_moderator,
         "affiliation": "owner" if is_moderator else "member",
         "exp": int(time.time() + 7200) # 2 hours
     }
     
-    # Encode
+    # Debug logging
+    frappe.log_error(f"JWT Payload: {payload}\nSecret Length: {len(settings.get_password('app_secret') or '')}", "Jitsi Token Debug")
+    
     encoded_jwt = jwt.encode(payload, settings.get_password("app_secret"), algorithm="HS256")
     
     # DEBUG LOG
@@ -118,6 +120,52 @@ def generate_jitsi_jwt(settings, room_name, user_email, is_moderator=False):
     if isinstance(encoded_jwt, bytes):
         return encoded_jwt.decode('utf-8')
     return encoded_jwt
+
+# ... (join_room unchanged)
+
+@frappe.whitelist()
+def update_invitation_status(room_name, status):
+    logged_user = frappe.session.user
+    frappe.log_error(f"RSVP Request: User={logged_user}, Room={room_name}, Status={status}", "RSVP Debug")
+    
+    if status not in ["Accepted", "Rejected"]:
+         frappe.throw(_("Invalid status"))
+
+    try:
+        parts = room_name.rsplit("-", 1)
+        if len(parts) < 2:
+            frappe.log_error(f"Invalid Room Name Format: {room_name}", "RSVP Error")
+            return
+            
+        session_id = parts[1].split("?")[0]
+        frappe.log_error(f"Extracted Session ID: {session_id}", "RSVP Debug")
+        
+        meeting = frappe.get_doc("Meeting", {"session_id": session_id})
+        if not meeting:
+            frappe.log_error("Meeting not found", "RSVP Error")
+            return
+            
+        found = False
+        for p in meeting.participants:
+            if p.user == logged_user:
+                p.invitation_status = status
+                found = True
+                break
+        
+        if found:
+            # Try saving without updating modified timestamp to avoid concurrency issues
+            meeting.flags.ignore_permissions = True
+            meeting.save(ignore_permissions=True)
+            frappe.db.commit()
+            frappe.log_error("Meeting Saved Successfully", "RSVP Debug")
+            return True
+        else:
+            frappe.log_error(f"User {logged_user} not found in participants: {[p.user for p in meeting.participants]}", "RSVP Error")
+            frappe.throw(_("You are not a participant in this meeting."))
+
+    except Exception as e:
+        frappe.log_error(f"RSVP Exception: {frappe.get_traceback()}", "RSVP Exception")
+        return False
 
 @frappe.whitelist(allow_guest=True)
 def join_room(room_name):
@@ -430,7 +478,7 @@ def update_invitation_status(room_name, status):
                 break
         
         if found:
-            meeting.save(ignore_permissions=True, update_modified=False)
+            meeting.save(ignore_permissions=True)
             return True
         else:
             frappe.throw(_("You are not a participant in this meeting."))

@@ -8,7 +8,7 @@ You can install this app using the [bench](https://github.com/frappe/bench) CLI:
 
 ```bash
 cd $PATH_TO_YOUR_BENCH
-bench get-app https://github.com/alpkanoz/erpnext_meeting --branch version-15
+bench get-app https://github.com/alpkanoz/erpnext_meet --branch version-15
 bench install-app erpnext_meet
 ```
 

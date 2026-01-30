@@ -3,6 +3,7 @@
 // Version 15 Fix applied
 frappe.ui.form.on("Meeting", {
     refresh: function (frm) {
+        console.log("ERPNext Meet v15.1 Loaded");
         setup_video_button(frm);
     }
 });
