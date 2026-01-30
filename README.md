@@ -92,7 +92,55 @@ This integration relies on custom Prosody plugins for features like:
     docker-compose down && docker-compose up -d
     ```
 
-### 4. ERPNext Configuration
+### 4. Jitsi Lobby Configuration (Manual Steps)
+
+To enable the "Waiting Room" (Lobby) feature properly, you must configure Prosody server-side.
+
+**Step 1: Configure `jitsi-meet.cfg.lua`**
+Edit your Prosody configuration file (e.g., `~/.jitsi-meet-cfg/prosody/config/conf.d/jitsi-meet.cfg.lua`).
+
+1.  Ensure `muc_lobby_rooms` is in `modules_enabled`.
+2.  Add the following block inside `Component "muc.meet.jitsi" "muc"` (usually near `muc_room_default_public_jids = true`):
+
+    ```lua
+    -- Force Lobby Mode by default
+    muc_room_default_config = {
+        ["muc#roomconfig_enable_lobby"] = true
+    }
+    ```
+
+**Step 2: Update `mod_dynamic_moderation.lua`**
+This plugin is critical for enforcing the lobby when a moderator creates a room. Ensure your `mod_dynamic_moderation.lua` includes the `muc-room-created` hook:
+
+```lua
+-- Hook: Room Created - Force Lobby Mode
+module:hook("muc-room-created", function(event)
+    local room = event.room;
+    module:log("info", "Room created: %s. Forcing Lobby Mode...", room.jid);
+    
+    -- Force Lobby Config
+    if room.set_lobby then
+         room:set_lobby(true);
+    elseif room._data then
+         room._data.lobby = true;
+    end
+    
+    -- Ensure config reflects this
+    local config = room:get_config();
+    if not config then config = {}; end
+    config["muc#roomconfig_enable_lobby"] = true;
+    room:set_config(config);
+    
+    module:log("info", "Lobby Mode forced for %s", room.jid);
+end);
+```
+
+**Step 3: Restart Prosody**
+```bash
+docker compose restart prosody
+```
+
+### 5. ERPNext Configuration
 
 1.  Go to **Meeting Settings**.
 2.  **Jitsi Domain**: Enter your `PUBLIC_URL` .

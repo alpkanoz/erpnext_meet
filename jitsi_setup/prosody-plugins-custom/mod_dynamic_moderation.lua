@@ -88,15 +88,16 @@ module:hook("muc-occupant-joined", function(event)
                     module:log("info", "=> ACTION: No owner. Promoting Authenticated User to Temp Owner: %s", current_occupant.jid);
                     force_affiliation(room, current_occupant.bare_jid, "owner");
                 else
-                    module:log("info", "=> ACTION: No owner. User is GUEST. Keeping as Member: %s", current_occupant.jid);
-                    -- Explicitly force member to verify
-                    force_affiliation(room, current_occupant.bare_jid, "member");
+                    module:log("info", "=> ACTION: No owner. User is GUEST. Ensuring affiliation NONE for Lobby: %s", current_occupant.jid);
+                    -- FORCE NONE so they get stuck in Lobby
+                    force_affiliation(room, current_occupant.bare_jid, "none");
                 end
             else
-                 -- Room has owner. Ensure this non-host is Member
+                 -- Room has owner (or user became owner by creating it).
+                 -- If this user is NOT a real host, they shouldn't be Owner nor Member.
                  if current_occupant.affiliation == "owner" then
-                     module:log("warn", "=> ACTION: Non-host user ended up as Owner! Demoting: %s", current_occupant.jid);
-                     force_affiliation(room, current_occupant.bare_jid, "member");
+                     module:log("warn", "=> ACTION: Non-host user ended up as Owner! Demoting to NONE for Lobby: %s", current_occupant.jid);
+                     force_affiliation(room, current_occupant.bare_jid, "none");
                  end
             end
         end
@@ -128,4 +129,27 @@ module:hook("muc-occupant-left", function(event)
             force_affiliation(room, potential_new_owner.bare_jid, "owner");
         end
     end);
+end);
+
+-- Hook: Room Created - Force Lobby Mode
+module:hook("muc-room-created", function(event)
+    local room = event.room;
+    module:log("info", "Room created: %s. Forcing Lobby Mode...", room.jid);
+    
+    -- Force Lobby Config
+    if room.set_lobby then
+         -- For newer Prosody/Jitsi versions
+         room:set_lobby(true);
+    elseif room._data then
+         -- Fallback/Direct manipulation
+         room._data.lobby = true;
+    end
+    
+    -- Ensure config reflects this (if persistent/form based)
+    local config = room:get_config();
+    if not config then config = {}; end
+    config["muc#roomconfig_enable_lobby"] = true;
+    room:set_config(config);
+    
+    module:log("info", "Lobby Mode forced for %s", room.jid);
 end);
