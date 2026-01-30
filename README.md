@@ -1,6 +1,17 @@
-### ERPNext Meet
+# ERPNext Meet
 
-Jitsi video conferencing app integration for Erpnext
+**Jitsi Meet Authentication and Integration for ERPNext**
+
+This application provides a secure integration between ERPNext and a self-hosted Jitsi Meet instance. It leverages JWT (JSON Web Tokens) for authentication and custom Prosody hooks for bi-directional state management, ensuring that meeting access is strictly controlled by ERPNext permissions.
+
+## Key Features
+
+*   **Contextual Meetings**: Initialize video conferences directly from any ERPNext document (e.g., Tasks, CRM Leads), automatically linking the session to the record.
+*   **JWT Authentication**: Enforces secure access control. Only authenticated ERPNext users with valid JWTs can join meetings; public access is disabled.
+*   **Dynamic Moderation**: Automatically assigns moderator privileges to the meeting host based on the JWT payload.
+*   **State Synchronization**: Monitors meeting activity via webhooks. Automatically updates the meeting status in ERPNext (Active/Ended) when participants join or leave.
+*   **Integrated Invitations**: Built-in invitation system using ERPNext's notification framework.
+*   **Self-Hosted Architecture**: Designed specifically for self-hosted Jitsi instances requiring strict data privacy and control.
 
 ### Installation
 
