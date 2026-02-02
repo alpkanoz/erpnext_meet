@@ -310,12 +310,28 @@ def invite_users(users, room_name, doctype, docname):
     # We point them to the join_room endpoint so they get their own JWT
     join_url = frappe.utils.get_url(f"/api/method/erpnext_meet.erpnext_meet.api.join_room?room_name={room_name}")
 
+    # Resolve Meeting Document from room_name to share it
+    # room_name format: Meet-{doctype}-{docname}-{session_id} or Meet-Instant-{session_id}
+    try:
+        parts = room_name.rsplit("-", 1)
+        if len(parts) >= 2:
+            session_id = parts[1].split("?")[0]
+            meeting_name = frappe.db.get_value("Meeting", {"session_id": session_id})
+            
+            if meeting_name:
+                for user in users:
+                    if user == frappe.session.user:
+                        continue
+                    
+                    # Grant Read Permission to the Meeting Document
+                    frappe.share.add("Meeting", meeting_name, user, read=1, write=0, share=0)
+    except Exception as e:
+        frappe.log_error(f"Share Error: {str(e)}", "Meeting Share Error")
+
     for user in users:
         if user == frappe.session.user:
             continue
-            
-        # Grant Read Permission via Share
-        frappe.share.add("Meeting", docname, user, read=1, write=0, share=0)
+
 
         doc = frappe.new_doc("Notification Log")
         doc.subject = f"Video Meeting Invite: {doctype} {docname}"
