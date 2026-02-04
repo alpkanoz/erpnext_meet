@@ -92,15 +92,14 @@ class Meeting(Document):
             added_users = list(new_participants - old_participants)
             
             if added_users:
-                import erpnext_meet.erpnext_meet.api as meeting_api
-                
-                room_name = f"Meet-{self.reference_doctype or 'Instant'}-{self.reference_docname or 'Meeting'}-{self.session_id}".replace(" ", "_")
-                if not self.reference_doctype:
-                     room_name = f"Meet-Instant-{self.session_id}"
-                
-                doctype = self.reference_doctype or "Meeting"
-                docname = self.reference_docname or self.name
-                
-                meeting_api.invite_users(added_users, room_name, doctype, docname, meeting_name=self.name)
+                # Enqueue background job - runs as Administrator
+                # IMPORTANT: enqueue_after_commit ensures Meeting is saved first
+                frappe.enqueue(
+                    "erpnext_meet.erpnext_meet.api.send_meeting_invites",
+                    meeting_name=self.name,
+                    added_users=added_users,
+                    queue="short",
+                    enqueue_after_commit=True
+                )
         except Exception as e:
             frappe.log_error(title="Meeting Invite Error", message=frappe.get_traceback())

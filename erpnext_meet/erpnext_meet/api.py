@@ -273,7 +273,7 @@ def start_instant_meeting():
 @frappe.whitelist()
 def invite_users(users, room_name, doctype, docname, meeting_name=None):
     """
-    Sends a System Notification to the selected users.
+    API wrapper that enqueues the invite job.
     users: JSON string list of user emails OR list object OR single string
     """
     import json
@@ -287,10 +287,8 @@ def invite_users(users, room_name, doctype, docname, meeting_name=None):
             users = json.loads(users)
         except (ValueError, TypeError):
             if users.startswith("[") and users.endswith("]"):
-                 # Failed json string resembling list
                  pass 
             else:
-                 # Single user as string
                  users = [users]
 
     if not isinstance(users, list):
@@ -302,61 +300,110 @@ def invite_users(users, room_name, doctype, docname, meeting_name=None):
     if not users:
         return
 
-    settings = frappe.get_single("Meeting Settings")
-    domain = settings.jitsi_domain
-    if not domain.startswith("http"):
-        domain = f"https://{domain}"
-    
-    # We point them to the join_room endpoint so they get their own JWT
-    join_url = frappe.utils.get_url(f"/api/method/erpnext_meet.erpnext_meet.api.join_room?room_name={room_name}")
-
-    # Resolve Meeting Document from room_name to share it
-    # room_name format: Meet-{doctype}-{docname}-{session_id} or Meet-Instant-{session_id}
-    try:
-        parts = room_name.rsplit("-", 1)
-        if len(parts) >= 2:
-            session_id = parts[1].split("?")[0]
-            meeting_name = frappe.db.get_value("Meeting", {"session_id": session_id})
-            
-            if meeting_name:
-                for user in users:
-                    if user == frappe.session.user:
-                        continue
-                    
-                    # Grant Read Permission to the Meeting Document
-                    frappe.share.add("Meeting", meeting_name, user, read=1, write=0, share=0)
-    except Exception as e:
-        frappe.log_error(f"Share Error: {str(e)}", "Meeting Share Error")
-
-    for user in users:
-        if user == frappe.session.user:
-            continue
-
-
-        doc = frappe.new_doc("Notification Log")
-        doc.subject = f"Video Meeting Invite: {doctype} {docname}"
-        doc.email_content = f"""
-            <p>You have been invited to a video meeting.</p>
-            <p><b>Reference:</b> {doctype} {docname}</p>
-            <p><a href="{join_url}" target="_blank">Click here to Join Meeting</a></p>
-        """
-        doc.for_user = user
-        doc.document_type = doctype
-        doc.document_name = docname
-        doc.type = "Alert"
-        doc.insert(ignore_permissions=True)
-
-        # Send Email
+    # Resolve meeting_name from room_name if not provided
+    if not meeting_name:
         try:
-            frappe.sendmail(
-                recipients=[user],
-                subject=f"Video Meeting Invite: {doctype} {docname}",
-                message=doc.email_content,
-                reference_doctype=doctype,
-                reference_name=docname
-            )
-        except Exception as e:
-            frappe.log_error(f"Failed to send meeting invite email to {user}: {str(e)}", "Meeting Email Error")
+            parts = room_name.rsplit("-", 1)
+            if len(parts) >= 2:
+                session_id = parts[1].split("?")[0]
+                meeting_name = frappe.db.get_value("Meeting", {"session_id": session_id})
+        except Exception:
+            pass
+
+    # Enqueue background job - runs as Administrator
+    frappe.enqueue(
+        "erpnext_meet.erpnext_meet.api.send_meeting_invites",
+        meeting_name=meeting_name,
+        added_users=users,
+        room_name=room_name,
+        doctype=doctype,
+        docname=docname,
+        queue="short"
+    )
+
+
+def send_meeting_invites(meeting_name, added_users=None, room_name=None, doctype=None, docname=None):
+    """
+    Background job function to send meeting invitations.
+    Runs as Administrator to bypass permission issues.
+    """
+    if not meeting_name:
+        frappe.log_error("send_meeting_invites called without meeting_name", "Meeting Invite Error")
+        return
+    
+    # Switch to Administrator to bypass permission issues
+    original_user = frappe.session.user
+    frappe.set_user("Administrator")
+    
+    try:
+        meeting = frappe.get_doc("Meeting", meeting_name)
+        
+        # Determine room_name if not passed
+        if not room_name:
+            session_id = meeting.session_id
+            if meeting.reference_doctype and meeting.reference_docname:
+                room_name = f"Meet-{meeting.reference_doctype}-{meeting.reference_docname}-{session_id}".replace(" ", "_")
+            else:
+                room_name = f"Meet-Instant-{session_id}"
+        
+        # Determine doctype/docname for notification
+        if not doctype:
+            doctype = meeting.reference_doctype or "Meeting"
+        if not docname:
+            docname = meeting.reference_docname or meeting.name
+        
+        # Build join URL
+        join_url = frappe.utils.get_url(f"/api/method/erpnext_meet.erpnext_meet.api.join_room?room_name={room_name}")
+        
+        # If no specific users provided, use all participants except host
+        if not added_users:
+            added_users = [p.user for p in meeting.participants if p.user != meeting.host]
+        
+        for user in added_users:
+            if user == meeting.host:
+                continue
+                
+            # Grant Read Permission via Share (running as Admin)
+            try:
+                frappe.share.add("Meeting", meeting_name, user, read=1, write=0, share=0)
+            except Exception as e:
+                frappe.log_error(f"Failed to share Meeting {meeting_name} with {user}: {str(e)}", "Meeting Share Error")
+
+            # Create Notification Log
+            try:
+                doc = frappe.new_doc("Notification Log")
+                doc.subject = f"Video Meeting Invite: {doctype} {docname}"
+                doc.email_content = f"""
+                    <p>You have been invited to a video meeting.</p>
+                    <p><b>Reference:</b> {doctype} {docname}</p>
+                    <p><a href="{join_url}" target="_blank">Click here to Join Meeting</a></p>
+                """
+                doc.for_user = user
+                doc.document_type = doctype
+                doc.document_name = docname
+                doc.type = "Alert"
+                doc.insert(ignore_permissions=True)
+            except Exception as e:
+                frappe.log_error(f"Failed to create notification for {user}: {str(e)}", "Meeting Notification Error")
+
+            # Send Email
+            try:
+                frappe.sendmail(
+                    recipients=[user],
+                    subject=f"Video Meeting Invite: {doctype} {docname}",
+                    message=f"""
+                        <p>You have been invited to a video meeting.</p>
+                        <p><b>Reference:</b> {doctype} {docname}</p>
+                        <p><a href="{join_url}" target="_blank">Click here to Join Meeting</a></p>
+                    """,
+                    reference_doctype="Meeting",
+                    reference_name=meeting_name
+                )
+            except Exception as e:
+                frappe.log_error(f"Failed to send meeting invite email to {user}: {str(e)}", "Meeting Email Error")
+    finally:
+        # Always restore original user
+        frappe.set_user(original_user)
 
 @frappe.whitelist()
 def get_active_room(doctype, docname):
