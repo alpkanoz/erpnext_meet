@@ -50,6 +50,19 @@ class Meeting(Document):
             event.status = "Open"
             event.description = f"Join link: {frappe.utils.get_url()}/app/meeting/{self.name}"
             event.set("event_participants", event_participants)
+            # Sync repeat settings
+            event.repeat_this_event = self.repeat_this_meeting or 0
+            event.repeat_on = self.repeat_on if self.repeat_this_meeting else ""
+            event.repeat_till = self.repeat_till if self.repeat_this_meeting else None
+            # Sync weekday fields for Weekly repeat
+            if self.repeat_this_meeting and self.repeat_on == "Weekly":
+                event.monday = getattr(self, 'monday', 0) or 0
+                event.tuesday = getattr(self, 'tuesday', 0) or 0
+                event.wednesday = getattr(self, 'wednesday', 0) or 0
+                event.thursday = getattr(self, 'thursday', 0) or 0
+                event.friday = getattr(self, 'friday', 0) or 0
+                event.saturday = getattr(self, 'saturday', 0) or 0
+                event.sunday = getattr(self, 'sunday', 0) or 0
             event.insert(ignore_permissions=True)
             
             frappe.db.set_value("Meeting", self.name, "event_ref", event.name)
@@ -64,22 +77,45 @@ class Meeting(Document):
                 event.set("event_participants", [])
                 event.set("event_participants", event_participants)
                 event.event_category = "Meeting"
-                event.event_type = "Private" 
+                event.event_type = "Private"
+                # Sync repeat settings
+                event.repeat_this_event = self.repeat_this_meeting or 0
+                event.repeat_on = self.repeat_on if self.repeat_this_meeting else ""
+                event.repeat_till = self.repeat_till if self.repeat_this_meeting else None
+                # Sync weekday fields for Weekly repeat
+                if self.repeat_this_meeting and self.repeat_on == "Weekly":
+                    event.monday = getattr(self, 'monday', 0) or 0
+                    event.tuesday = getattr(self, 'tuesday', 0) or 0
+                    event.wednesday = getattr(self, 'wednesday', 0) or 0
+                    event.thursday = getattr(self, 'thursday', 0) or 0
+                    event.friday = getattr(self, 'friday', 0) or 0
+                    event.saturday = getattr(self, 'saturday', 0) or 0
+                    event.sunday = getattr(self, 'sunday', 0) or 0
                 event.save(ignore_permissions=True)
             except frappe.DoesNotExistError:
                 self.event_ref = None
                 self.sync_with_event()
                 return
 
+
+        # Share Event with all participants for calendar visibility
         for participant in event_participants:
             user = participant.get("reference_docname")
             if user:
-                 frappe.share.add_docshare("Event", event.name, user, read=1, write=0, share=0, flags={"ignore_share_permission": True})
+                try:
+                    frappe.share.add_docshare("Event", event.name, user, read=1, write=0, share=0, flags={"ignore_share_permission": True, "ignore_permissions": True})
+                except Exception as e:
+                    frappe.log_error(f"Failed to share Event {event.name} with {user}: {str(e)}", "Event Share Error")
 
+        # Remove sharing for participants no longer in the list
         valid_users = [p.get("reference_docname") for p in event_participants]
         for p in self.participants:
             if p.user not in valid_users:
-                 frappe.share.remove("Event", event.name, p.user, flags={"ignore_share_permission": True})
+                try:
+                    frappe.share.remove("Event", event.name, p.user, flags={"ignore_share_permission": True, "ignore_permissions": True})
+                except Exception:
+                    pass
+
 
     def invite_new_participants(self):
         try:

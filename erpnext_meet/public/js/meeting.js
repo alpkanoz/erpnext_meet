@@ -73,7 +73,8 @@ function setup_video_button(frm) {
             join_btn.addClass("btn-danger");
         }
 
-        if (frm.doc.host === frappe.session.user) {
+        // Only show End Meeting button for non-repeating meetings
+        if (frm.doc.host === frappe.session.user && !frm.doc.repeat_this_meeting) {
             frm.add_custom_button('End Meeting', function () {
                 frappe.confirm('End this meeting?', () => {
                     frappe.call({

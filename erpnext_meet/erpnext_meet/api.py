@@ -448,11 +448,30 @@ def end_meeting(room_name, status="Ended"):
             
         session_id = parts[1].split("?")[0] # Safety split if query params exist
         
+        # Check if this is a repeating meeting
+        meeting = frappe.db.get_value("Meeting", 
+            {"session_id": session_id}, 
+            ["name", "repeat_this_meeting", "event_ref"], 
+            as_dict=True
+        )
+        
+        if not meeting:
+            return False
+        
+        # Prevent manual ending of repeating meetings
+        if meeting.repeat_this_meeting and status == "Ended":
+            frappe.throw(_("Repeating meetings cannot be ended manually. They will end automatically after the repeat_till date."))
+        
+        # Update meeting status
         frappe.db.sql("""
             UPDATE `tabMeeting`
-            SET status = %s, modified = NOW()
+            SET status = %s, modified = NOW(), end_time = NOW()
             WHERE session_id = %s
         """, (status, session_id))
+        
+        # Sync Event status for non-repeating meetings that are being ended
+        if meeting.event_ref and not meeting.repeat_this_meeting and status == "Ended":
+            frappe.db.set_value("Event", meeting.event_ref, "status", "Completed")
         
         frappe.db.commit()
         return True
