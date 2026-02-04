@@ -2,7 +2,7 @@
     "charts": [],
     "content": "[{\"id\":\"header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Meeting Workspace</span>\",\"col\":12}},{\"id\":\"card1\",\"type\":\"card\",\"data\":{\"card_name\":\"Meetings\",\"col\":4}}]",
     "doctype": "Workspace",
-    "icon": "video",
+    "icon": "share-people",
     "label": "Erpnext Meeting",
     "links": [
         {
@@ -33,5 +33,6 @@
             "role": "All"
         }
     ],
-    "title": "Meeting Workspace"
+    "sequence_id": 28.0,
+    "title": "Meeting"
 }
