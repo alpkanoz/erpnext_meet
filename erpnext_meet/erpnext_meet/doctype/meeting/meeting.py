@@ -101,6 +101,6 @@ class Meeting(Document):
                 doctype = self.reference_doctype or "Meeting"
                 docname = self.reference_docname or self.name
                 
-                meeting_api.invite_users(added_users, room_name, doctype, docname)
+                meeting_api.invite_users(added_users, room_name, doctype, docname, meeting_name=self.name)
         except Exception as e:
             frappe.log_error(title="Meeting Invite Error", message=frappe.get_traceback())

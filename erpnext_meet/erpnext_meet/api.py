@@ -271,7 +271,7 @@ def start_instant_meeting():
         frappe.throw(_("Could not start instant meeting. Check logs."))
 
 @frappe.whitelist()
-def invite_users(users, room_name, doctype, docname):
+def invite_users(users, room_name, doctype, docname, meeting_name=None):
     """
     Sends a System Notification to the selected users.
     users: JSON string list of user emails OR list object OR single string
@@ -347,13 +347,16 @@ def invite_users(users, room_name, doctype, docname):
         doc.insert(ignore_permissions=True)
 
         # Send Email
-        frappe.sendmail(
-            recipients=[user],
-            subject=f"Video Meeting Invite: {doctype} {docname}",
-            message=doc.email_content,
-            reference_doctype=doctype,
-            reference_name=docname
-        )
+        try:
+            frappe.sendmail(
+                recipients=[user],
+                subject=f"Video Meeting Invite: {doctype} {docname}",
+                message=doc.email_content,
+                reference_doctype=doctype,
+                reference_name=docname
+            )
+        except Exception as e:
+            frappe.log_error(f"Failed to send meeting invite email to {user}: {str(e)}", "Meeting Email Error")
 
 @frappe.whitelist()
 def get_active_room(doctype, docname):

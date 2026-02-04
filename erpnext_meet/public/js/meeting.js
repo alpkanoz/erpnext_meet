@@ -197,7 +197,8 @@ function create_and_join_room(invited_users) {
                             users: invited_users,
                             room_name: room_data.room_name,
                             doctype: cur_frm ? cur_frm.doctype : "Meeting",
-                            docname: cur_frm ? cur_frm.docname : room_data.session_name
+                            docname: cur_frm ? cur_frm.docname : room_data.session_name,
+                            meeting_name: room_data.session_name
                         }
                     });
                 }
