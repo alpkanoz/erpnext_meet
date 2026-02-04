@@ -14,12 +14,6 @@
             "link_to": "Meeting",
             "link_type": "DocType",
             "type": "Link"
-        },
-        {
-            "label": "Settings",
-            "link_to": "Meeting Settings",
-            "link_type": "DocType",
-            "type": "Link"
         }
     ],
     "module": "erpnext_meet",
