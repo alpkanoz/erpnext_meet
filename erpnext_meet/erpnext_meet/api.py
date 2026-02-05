@@ -321,6 +321,51 @@ def invite_users(users, room_name, doctype, docname, meeting_name=None):
         queue="short"
     )
 
+@frappe.whitelist()
+def sync_event_shares(event_name, valid_users):
+    """
+    Background job to sync Event shares.
+    Ensures that only 'valid_users' (and owner) have access.
+    Runs as Administrator.
+    """
+    import frappe.share
+    
+    # Switch to Administrator
+    original_user = frappe.session.user
+    frappe.set_user("Administrator")
+    
+    try:
+        if isinstance(valid_users, str):
+             import json
+             valid_users = json.loads(valid_users)
+        
+        valid_users_set = set(valid_users)
+        
+        # 1. Share with valid users
+        for user in valid_users:
+            if user:
+                try:
+                    frappe.share.add_docshare("Event", event_name, user, read=1, write=0, share=0, flags={"ignore_share_permission": True, "ignore_permissions": True})
+                except Exception as e:
+                    frappe.log_error(f"Failed to share Event {event_name} with {user}: {str(e)}", "Event Share Error")
+
+        # 2. Unshare with others (Fetch current shares first)
+        try:
+             current_shares = frappe.share.get_users("Event", event_name)
+             # current_shares is a list of objects with 'user' attribute
+             for share in current_shares:
+                 if share.user not in valid_users_set and share.user != frappe.db.get_value("Event", event_name, "owner"):
+                      try:
+                          frappe.share.remove("Event", event_name, share.user, flags={"ignore_share_permission": True, "ignore_permissions": True})
+                      except Exception:
+                          pass
+        except Exception as e:
+             frappe.log_error(f"Failed to fetch/remove old shares for {event_name}: {str(e)}", "Event Share Error")
+
+    except Exception as e:
+         frappe.log_error(f"Background Sync Share Error: {str(e)}", "Event Share Error")
+    finally:
+         frappe.set_user(original_user)
 
 def send_meeting_invites(meeting_name, added_users=None, room_name=None, doctype=None, docname=None):
     """

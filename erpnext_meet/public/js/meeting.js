@@ -74,6 +74,8 @@ function setup_video_button(frm) {
         }
 
         // Only show End Meeting button for non-repeating meetings
+        // REMOVED: Auto timeout logic handles ending meetings now.
+        /*
         if (frm.doc.host === frappe.session.user && !frm.doc.repeat_this_meeting) {
             frm.add_custom_button('End Meeting', function () {
                 frappe.confirm('End this meeting?', () => {
@@ -87,6 +89,7 @@ function setup_video_button(frm) {
                 });
             });
         }
+        */
     }
 }
 

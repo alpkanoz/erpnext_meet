@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 import frappe
+import frappe.share
 from frappe.model.document import Document
 
 class Meeting(Document):
@@ -48,7 +49,12 @@ class Meeting(Document):
             event.event_category = "Meeting" 
             event.event_type = "Private"
             event.status = "Open"
-            event.description = f"Join link: {frappe.utils.get_url()}/app/meeting/{self.name}"
+            
+            description_content = f"Join link: {frappe.utils.get_url()}/app/meeting/{self.name}"
+            if self.meeting_details:
+                description_content += f"<br><br>{self.meeting_details}"
+            
+            event.description = description_content
             event.set("event_participants", event_participants)
             # Sync repeat settings
             event.repeat_this_event = self.repeat_this_meeting or 0
@@ -74,10 +80,19 @@ class Meeting(Document):
                 event.subject = f"Video Meeting: {self.reference_docname or 'Meeting'}"
                 event.starts_on = starts_on
                 event.ends_on = ends_on
+                
+                # Update participants safely
                 event.set("event_participants", [])
                 event.set("event_participants", event_participants)
+                
                 event.event_category = "Meeting"
-                event.event_type = "Private"
+                event.event_type = "Private" # Use Private + Share
+                
+                description_content = f"Join link: {frappe.utils.get_url()}/app/meeting/{self.name}"
+                if self.meeting_details:
+                    description_content += f"<br><br>{self.meeting_details}"
+                event.description = description_content
+                
                 # Sync repeat settings
                 event.repeat_this_event = self.repeat_this_meeting or 0
                 event.repeat_on = self.repeat_on if self.repeat_this_meeting else ""
@@ -97,24 +112,17 @@ class Meeting(Document):
                 self.sync_with_event()
                 return
 
-
-        # Share Event with all participants for calendar visibility
-        for participant in event_participants:
-            user = participant.get("reference_docname")
-            if user:
-                try:
-                    frappe.share.add_docshare("Event", event.name, user, read=1, write=0, share=0, flags={"ignore_share_permission": True, "ignore_permissions": True})
-                except Exception as e:
-                    frappe.log_error(f"Failed to share Event {event.name} with {user}: {str(e)}", "Event Share Error")
-
-        # Remove sharing for participants no longer in the list
+        # Enqueue background job to sync shares
+        # This avoids permission issues and speeds up save
         valid_users = [p.get("reference_docname") for p in event_participants]
-        for p in self.participants:
-            if p.user not in valid_users:
-                try:
-                    frappe.share.remove("Event", event.name, p.user, flags={"ignore_share_permission": True, "ignore_permissions": True})
-                except Exception:
-                    pass
+        if valid_users:
+             frappe.enqueue(
+                 "erpnext_meet.erpnext_meet.api.sync_event_shares",
+                 event_name=event.name,
+                 valid_users=valid_users,
+                 queue="short",
+                 enqueue_after_commit=True
+             )
 
 
     def invite_new_participants(self):
