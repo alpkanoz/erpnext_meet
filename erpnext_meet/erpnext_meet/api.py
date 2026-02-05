@@ -433,9 +433,29 @@ def send_meeting_invites(meeting_name, added_users=None, room_name=None, doctype
 
             # Send Email
             try:
+                # 1. Host Name
+                host_name = frappe.utils.get_fullname(meeting.host)
+                intro_msg = _("{0} has invited you to a video meeting.").format(host_name)
+
+                # 2. Repeat Info
+                repeat_info = ""
+                if meeting.repeat_this_meeting:
+                    repeat_info = _(meeting.repeat_on)
+                    if meeting.repeat_on == "Weekly":
+                        days = []
+                        if meeting.monday: days.append(_("Monday"))
+                        if meeting.tuesday: days.append(_("Tuesday"))
+                        if meeting.wednesday: days.append(_("Wednesday"))
+                        if meeting.thursday: days.append(_("Thursday"))
+                        if meeting.friday: days.append(_("Friday"))
+                        if meeting.saturday: days.append(_("Saturday"))
+                        if meeting.sunday: days.append(_("Sunday"))
+                        if days:
+                            repeat_info += f" ({', '.join(days)})"
+
                 # Prepare Context for Template
                 context = {
-                    "intro_message": _("You have been invited to a video meeting."),
+                    "intro_message": intro_msg,
                     "reference_label": _("Reference"),
                     "reference_doctype": doctype,
                     "reference_docname": docname,
@@ -445,6 +465,8 @@ def send_meeting_invites(meeting_name, added_users=None, room_name=None, doctype
                     "end_time": frappe.utils.format_datetime(meeting.end_time, "medium") if meeting.end_time else None,
                     "details_label": _("Meeting Details"),
                     "meeting_details": meeting.get("meeting_details"),
+                    "repeat_label": _("Repeats"),
+                    "repeat_info": repeat_info,
                     "join_button_label": _("Click here to Join Meeting"),
                     "join_url": join_url
                 }
@@ -463,8 +485,12 @@ def send_meeting_invites(meeting_name, added_users=None, room_name=None, doctype
                         <p><a href="{join_url}" target="_blank">{context['join_button_label']}</a></p>
                      """
 
+                # Format Recipient as "Name <email>"
+                recipient_name = frappe.utils.get_fullname(user)
+                recipient = f"{recipient_name} <{user}>"
+
                 frappe.sendmail(
-                    recipients=[user],
+                    recipients=[recipient],
                     subject=subject,
                     message=message,
                     reference_doctype="Meeting",
