@@ -26,7 +26,9 @@
         "saturday",
         "sunday",
         "section_break_participants",
-        "participants"
+        "participants",
+        "section_break_details",
+        "meeting_details"
     ],
     "fields": [
         {
@@ -171,6 +173,16 @@
             "fieldtype": "Table",
             "label": "Participants",
             "options": "Meeting Participant"
+        },
+        {
+            "fieldname": "section_break_details",
+            "fieldtype": "Section Break",
+            "label": "Meeting Details"
+        },
+        {
+            "fieldname": "meeting_details",
+            "fieldtype": "Text Editor",
+            "label": "Meeting Details"
         }
     ],
     "issingle": 0,

@@ -388,14 +388,40 @@ def send_meeting_invites(meeting_name, added_users=None, room_name=None, doctype
 
             # Send Email
             try:
+                # Prepare Context for Template
+                context = {
+                    "intro_message": _("You have been invited to a video meeting."),
+                    "reference_label": _("Reference"),
+                    "reference_doctype": doctype,
+                    "reference_docname": docname,
+                    "start_time_label": _("Start Time"),
+                    "start_time": frappe.utils.format_datetime(meeting.start_time, "medium"),
+                    "end_time_label": _("End Time"),
+                    "end_time": frappe.utils.format_datetime(meeting.end_time, "medium") if meeting.end_time else None,
+                    "details_label": _("Meeting Details"),
+                    "meeting_details": meeting.get("meeting_details"),
+                    "join_button_label": _("Click here to Join Meeting"),
+                    "join_url": join_url
+                }
+
+                # Render Template
+                if frappe.db.exists("Email Template", "Meeting Invitation"):
+                     template = frappe.get_doc("Email Template", "Meeting Invitation")
+                     subject = frappe.render_template(template.subject, context)
+                     message = frappe.render_template(template.response, context)
+                else:
+                     # Fallback if template missing
+                     subject = f"Video Meeting Invite: {doctype} {docname}"
+                     message = f"""
+                        <p>{context['intro_message']}</p>
+                        <p><b>{context['reference_label']}:</b> {doctype} {docname}</p>
+                        <p><a href="{join_url}" target="_blank">{context['join_button_label']}</a></p>
+                     """
+
                 frappe.sendmail(
                     recipients=[user],
-                    subject=f"Video Meeting Invite: {doctype} {docname}",
-                    message=f"""
-                        <p>You have been invited to a video meeting.</p>
-                        <p><b>Reference:</b> {doctype} {docname}</p>
-                        <p><a href="{join_url}" target="_blank">Click here to Join Meeting</a></p>
-                    """,
+                    subject=subject,
+                    message=message,
                     reference_doctype="Meeting",
                     reference_name=meeting_name
                 )
