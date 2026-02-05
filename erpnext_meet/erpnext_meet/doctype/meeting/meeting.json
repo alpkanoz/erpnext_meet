@@ -79,7 +79,7 @@
         {
             "fieldname": "reference_doctype",
             "fieldtype": "Link",
-            "label": "Reference DocType",
+            "label": "Reference Document",
             "options": "DocType"
         },
         {

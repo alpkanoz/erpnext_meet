@@ -31,12 +31,13 @@ def hourly():
         frappe.db.commit()
 
     # 2. Timeout for Stuck "Active" Meetings (24 Hours) - Only non-repeating
+    # Use start_time instead of modified to avoid premature timeout for future meetings
     active_timeout_threshold = add_to_date(now_datetime(), hours=-24)
     
     stuck_meetings = frappe.db.get_all("Meeting",
         filters={
             "status": "Active",
-            "modified": ["<", active_timeout_threshold],
+            "start_time": ["<", active_timeout_threshold],
             "repeat_this_meeting": 0
         },
         fields=["name", "event_ref"]
