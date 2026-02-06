@@ -20,7 +20,7 @@ def create_room(doctype, docname):
     session_id = str(uuid.uuid4())[:8]
     
     # Create Call Session Record
-    session = frappe.get_doc({
+    session_data = {
         "doctype": "Meeting",
         "session_id": session_id,
         "reference_doctype": doctype,
@@ -28,7 +28,28 @@ def create_room(doctype, docname):
         "host": frappe.session.user,
         "start_time": frappe.utils.now(),
         "status": "Active"
-    })
+    }
+
+    # If linked to an Event, sync recurrence and timing details
+    if doctype == "Event" and docname:
+        try:
+            event_doc = frappe.get_doc("Event", docname)
+            session_data["start_time"] = event_doc.starts_on
+            session_data["end_time"] = event_doc.ends_on
+            session_data["event_ref"] = docname
+            
+            if event_doc.repeat_this_event:
+                session_data["repeat_this_meeting"] = 1
+                session_data["repeat_on"] = event_doc.repeat_on
+                session_data["repeat_till"] = event_doc.repeat_till
+                
+                if event_doc.repeat_on == "Weekly":
+                    for day in ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]:
+                        session_data[day] = event_doc.get(day)
+        except Exception as e:
+            frappe.log_error(f"Failed to sync Event details to Meeting: {str(e)}", "Meeting Creation Error")
+
+    session = frappe.get_doc(session_data)
     
     # Add host as participant
     session.append("participants", {
