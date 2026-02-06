@@ -5,6 +5,7 @@ from frappe import _
 import jwt
 import time
 import uuid
+import os
 
 @frappe.whitelist()
 def create_room(doctype, docname):
@@ -694,3 +695,173 @@ def update_invitation_status(room_name, status):
 def get_jitsi_domain():
     settings = frappe.get_single("Meeting Settings")
     return settings.jitsi_domain
+
+# ========== TRANSCRIPTION API ==========
+
+@frappe.whitelist()
+def start_transcription(meeting_name, audio_file_path):
+    """
+    Start transcription for a meeting.
+    Enqueues a background job for processing.
+    
+    Args:
+        meeting_name: Name of the Meeting document
+        audio_file_path: Path to the audio file (on server)
+    
+    Returns:
+        dict with status and meeting_notes_name
+    """
+    settings = frappe.get_single("Meeting Settings")
+    
+    if not settings.enable_transcription:
+        frappe.throw(_("Transcription is disabled in Meeting Settings"))
+    
+    if not os.path.exists(audio_file_path):
+        frappe.throw(_("Audio file not found: {0}").format(audio_file_path))
+    
+    # Create preliminary Meeting Notes record
+    notes = frappe.new_doc("Meeting Notes")
+    notes.meeting = meeting_name
+    notes.transcription_status = "Processing"
+    notes.insert(ignore_permissions=True)
+    frappe.db.commit()
+    
+    # Enqueue background job
+    delete_after = bool(settings.auto_delete_audio)
+    
+    frappe.enqueue(
+        "erpnext_meet.erpnext_meet.utils.transcription.process_transcription",
+        audio_file=audio_file_path,
+        meeting_name=meeting_name,
+        delete_after=delete_after,
+        queue="long",
+        timeout=3600  # 1 hour timeout for long recordings
+    )
+    
+    return {
+        "status": "processing",
+        "meeting_notes_name": notes.name,
+        "message": _("Transcription started. This may take a few minutes.")
+    }
+
+@frappe.whitelist()
+def get_transcription_status(meeting_name):
+    """
+    Get transcription status for a meeting.
+    
+    Args:
+        meeting_name: Name of the Meeting document
+    
+    Returns:
+        dict with status and notes details
+    """
+    notes = frappe.get_all("Meeting Notes",
+        filters={"meeting": meeting_name},
+        fields=["name", "transcription_status", "created_at", "duration"],
+        order_by="created_at desc",
+        limit=1
+    )
+    
+    if not notes:
+        return {"status": "none", "message": _("No transcription found for this meeting")}
+    
+    note = notes[0]
+    return {
+        "status": note.transcription_status.lower(),
+        "meeting_notes_name": note.name,
+        "created_at": note.created_at,
+        "duration": note.duration
+    }
+
+@frappe.whitelist()
+def export_meeting_notes(meeting_notes_name, format="txt"):
+    """
+    Export meeting notes in specified format.
+    
+    Args:
+        meeting_notes_name: Name of the Meeting Notes document
+        format: Export format (txt, docx, pdf)
+    
+    Returns:
+        URL to download the file
+    """
+    import json as json_lib
+    from erpnext_meet.erpnext_meet.utils.transcription import (
+        export_to_txt, export_to_docx, export_to_pdf
+    )
+    
+    notes = frappe.get_doc("Meeting Notes", meeting_notes_name)
+    
+    if not notes.raw_transcript:
+        frappe.throw(_("No transcript data available"))
+    
+    transcript = json_lib.loads(notes.raw_transcript)
+    meeting = frappe.get_doc("Meeting", notes.meeting)
+    title = f"Meeting Transcript - {meeting.name}"
+    
+    # Generate file content
+    if format == "txt":
+        content = export_to_txt(transcript, title)
+        filename = f"{meeting_notes_name}.txt"
+        content_type = "text/plain"
+        file_content = content.encode("utf-8")
+    elif format == "docx":
+        file_content = export_to_docx(transcript, title)
+        filename = f"{meeting_notes_name}.docx"
+        content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    elif format == "pdf":
+        file_content = export_to_pdf(transcript, title)
+        filename = f"{meeting_notes_name}.pdf"
+        content_type = "application/pdf"
+    else:
+        frappe.throw(_("Invalid format. Use txt, docx, or pdf"))
+    
+    # Save as File document
+    file_doc = frappe.get_doc({
+        "doctype": "File",
+        "file_name": filename,
+        "attached_to_doctype": "Meeting Notes",
+        "attached_to_name": meeting_notes_name,
+        "content": file_content,
+        "is_private": 1
+    })
+    file_doc.save(ignore_permissions=True)
+    
+    return file_doc.file_url
+
+@frappe.whitelist()
+def get_audio_storage_path():
+    """
+    Get the configured audio storage path.
+    Creates the directory if it doesn't exist.
+    
+    Returns:
+        Path to audio storage directory
+    """
+    settings = frappe.get_single("Meeting Settings")
+    path = settings.audio_storage_path
+    
+    # Default: use app directory
+    if not path:
+        import erpnext_meet
+        app_path = os.path.dirname(os.path.dirname(erpnext_meet.__file__))
+        path = os.path.join(app_path, "erpnext_meet", "meeting_recordings")
+    
+    # Create directory if it doesn't exist
+    if not os.path.exists(path):
+        try:
+            os.makedirs(path, exist_ok=True)
+        except PermissionError:
+            frappe.throw(_("Cannot create audio storage directory: {0}").format(path))
+    
+    return path
+
+@frappe.whitelist()
+def is_transcription_enabled():
+    """Check if transcription is enabled in settings."""
+    settings = frappe.get_single("Meeting Settings")
+    return {
+        "enabled": bool(settings.enable_transcription),
+        "language": settings.transcription_language or "tr",
+        "model": settings.whisper_model or "large-v2"
+    }

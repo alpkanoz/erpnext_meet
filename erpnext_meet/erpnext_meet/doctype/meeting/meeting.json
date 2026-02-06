@@ -28,7 +28,9 @@
         "section_break_participants",
         "participants",
         "section_break_details",
-        "meeting_details"
+        "meeting_details",
+        "sb_transcription",
+        "transcription_status"
     ],
     "fields": [
         {
@@ -183,11 +185,30 @@
             "fieldname": "meeting_details",
             "fieldtype": "Text Editor",
             "label": "Meeting Details"
+        },
+        {
+            "fieldname": "sb_transcription",
+            "fieldtype": "Section Break",
+            "label": "Transcription"
+        },
+        {
+            "default": "None",
+            "fieldname": "transcription_status",
+            "fieldtype": "Select",
+            "in_list_view": 1,
+            "label": "Transcription Status",
+            "options": "None\nProcessing\nCompleted\nFailed",
+            "read_only": 1
         }
     ],
     "issingle": 0,
-    "links": [],
-    "modified": "2026-02-04 17:39:00.000000",
+    "links": [
+        {
+            "link_doctype": "Meeting Notes",
+            "link_fieldname": "meeting"
+        }
+    ],
+    "modified": "2026-02-06 14:50:00.000000",
     "modified_by": "Administrator",
     "module": "erpnext_meet",
     "name": "Meeting",

@@ -1,0 +1,97 @@
+{
+    "actions": [],
+    "autoname": "format:NOTES-{meeting}-{#####}",
+    "creation": "2026-02-06 14:50:00.000000",
+    "doctype": "DocType",
+    "engine": "InnoDB",
+    "field_order": [
+        "meeting",
+        "transcription_status",
+        "column_break_main",
+        "created_at",
+        "duration",
+        "section_break_content",
+        "raw_transcript"
+    ],
+    "fields": [
+        {
+            "fieldname": "meeting",
+            "fieldtype": "Link",
+            "in_list_view": 1,
+            "label": "Meeting",
+            "options": "Meeting",
+            "reqd": 1
+        },
+        {
+            "default": "Processing",
+            "fieldname": "transcription_status",
+            "fieldtype": "Select",
+            "in_list_view": 1,
+            "label": "Status",
+            "options": "Processing\nCompleted\nFailed"
+        },
+        {
+            "fieldname": "column_break_main",
+            "fieldtype": "Column Break"
+        },
+        {
+            "fieldname": "created_at",
+            "fieldtype": "Datetime",
+            "in_list_view": 1,
+            "label": "Created At",
+            "read_only": 1
+        },
+        {
+            "fieldname": "duration",
+            "fieldtype": "Duration",
+            "label": "Audio Duration"
+        },
+        {
+            "fieldname": "section_break_content",
+            "fieldtype": "Section Break",
+            "label": "Transcript Content"
+        },
+        {
+            "fieldname": "raw_transcript",
+            "fieldtype": "JSON",
+            "label": "Transcript Data",
+            "description": "Full transcript in JSON format with timestamps and speaker info"
+        }
+    ],
+    "index_web_pages_for_search": 1,
+    "issingle": 0,
+    "links": [],
+    "modified": "2026-02-06 14:50:00.000000",
+    "modified_by": "Administrator",
+    "module": "erpnext_meet",
+    "name": "Meeting Notes",
+    "naming_rule": "Expression",
+    "owner": "Administrator",
+    "permissions": [
+        {
+            "create": 1,
+            "delete": 1,
+            "email": 1,
+            "export": 1,
+            "print": 1,
+            "read": 1,
+            "report": 1,
+            "role": "System Manager",
+            "share": 1,
+            "write": 1
+        },
+        {
+            "email": 1,
+            "export": 1,
+            "print": 1,
+            "read": 1,
+            "report": 1,
+            "role": "All",
+            "share": 1
+        }
+    ],
+    "sort_field": "modified",
+    "sort_order": "DESC",
+    "states": [],
+    "track_changes": 1
+}

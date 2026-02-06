@@ -24,7 +24,16 @@
         "show_brand_watermark",
         "brand_watermark_link",
         "show_jitsi_watermark",
-        "toolbar_buttons"
+        "toolbar_buttons",
+        "sb_transcription",
+        "enable_transcription",
+        "transcription_language",
+        "whisper_model",
+        "column_break_transcription",
+        "cpu_threads",
+        "huggingface_token",
+        "auto_delete_audio",
+        "audio_storage_path"
     ],
     "fields": [
         {
@@ -145,11 +154,75 @@
             "fieldname": "toolbar_buttons",
             "fieldtype": "Small Text",
             "label": "Toolbar Buttons (Comma Separated)"
+        },
+        {
+            "fieldname": "sb_transcription",
+            "fieldtype": "Section Break",
+            "label": "Transcription Settings"
+        },
+        {
+            "default": "0",
+            "fieldname": "enable_transcription",
+            "fieldtype": "Check",
+            "label": "Enable Meeting Transcription",
+            "description": "Enable real-time speech recognition and note-taking for meetings"
+        },
+        {
+            "default": "tr",
+            "depends_on": "enable_transcription",
+            "fieldname": "transcription_language",
+            "fieldtype": "Select",
+            "label": "Transcription Language",
+            "options": "tr\nen\nde\nfr\nes\nauto"
+        },
+        {
+            "default": "large-v2",
+            "depends_on": "enable_transcription",
+            "fieldname": "whisper_model",
+            "fieldtype": "Select",
+            "label": "Whisper Model",
+            "options": "base\nsmall\nmedium\nlarge-v2\nlarge-v3",
+            "description": "Larger models are more accurate but slower"
+        },
+        {
+            "fieldname": "column_break_transcription",
+            "fieldtype": "Column Break"
+        },
+        {
+            "default": "48",
+            "depends_on": "enable_transcription",
+            "fieldname": "cpu_threads",
+            "fieldtype": "Int",
+            "label": "CPU Threads",
+            "description": "Number of CPU threads for transcription (default: 48)"
+        },
+        {
+            "depends_on": "enable_transcription",
+            "fieldname": "huggingface_token",
+            "fieldtype": "Password",
+            "label": "HuggingFace Token",
+            "description": "Required for speaker diarization (pyannote). Get from huggingface.co/settings/tokens"
+        },
+        {
+            "default": "1",
+            "depends_on": "enable_transcription",
+            "fieldname": "auto_delete_audio",
+            "fieldtype": "Check",
+            "label": "Auto-delete Audio Files",
+            "description": "Automatically delete temporary audio files after transcription"
+        },
+        {
+            "default": "",
+            "depends_on": "enable_transcription",
+            "fieldname": "audio_storage_path",
+            "fieldtype": "Data",
+            "label": "Audio Storage Path",
+            "description": "Leave empty for default: [app_path]/meeting_recordings"
         }
     ],
     "issingle": 1,
     "links": [],
-    "modified": "2024-05-22 10:00:00.000000",
+    "modified": "2026-02-06 14:50:00.000000",
     "modified_by": "Administrator",
     "module": "erpnext_meet",
     "name": "Meeting Settings",
