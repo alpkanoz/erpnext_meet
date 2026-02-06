@@ -176,7 +176,7 @@
             "options": "tr\nen\nde\nfr\nes\nauto"
         },
         {
-            "default": "large-v2",
+            "default": "small",
             "depends_on": "enable_transcription",
             "fieldname": "whisper_model",
             "fieldtype": "Select",
@@ -189,12 +189,12 @@
             "fieldtype": "Column Break"
         },
         {
-            "default": "48",
+            "default": "4",
             "depends_on": "enable_transcription",
             "fieldname": "cpu_threads",
             "fieldtype": "Int",
             "label": "CPU Threads",
-            "description": "Number of CPU threads for transcription (default: 48)"
+            "description": "Number of CPU threads for transcription (default: 4)"
         },
         {
             "depends_on": "enable_transcription",
