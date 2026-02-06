@@ -101,12 +101,13 @@ class JitsiTranscriber:
                 "Transcription Error"
             )
     
-    def transcribe(self, audio_file: str) -> List[Dict[str, Any]]:
+    def transcribe(self, audio_file: str, meeting_name: str = None) -> List[Dict[str, Any]]:
         """
         Transcribe an audio file.
         
         Args:
             audio_file: Path to audio file (WAV, MP3, etc.)
+            meeting_name: Optional Meeting name for speaker correlation
             
         Returns:
             List of transcript segments with timestamps and speaker info
@@ -155,11 +156,92 @@ class JitsiTranscriber:
                         if turn.start <= item["start"] <= turn.end:
                             item["speaker"] = speaker_label
                             break
+                            item["speaker"] = speaker_label
+                            break
             except Exception as e:
                 frappe.log_error(
                     f"Diarization failed: {str(e)}",
                     "Transcription Warning"
                 )
+
+        # Apply Real-time correlation if meeting_name is provided
+        if meeting_name:
+            self._apply_speaker_correlation(meeting_name, transcript, audio_file)
+        
+    def _apply_speaker_correlation(self, meeting_name: str, transcript: List[Dict[str, Any]], audio_file: str):
+        """
+        Correlate transcript segments with Speaker Logger events to identify real names.
+        """
+        # 1. Find Event Log File
+        from erpnext_meet.erpnext_meet.api import get_audio_storage_path
+        storage_path = get_audio_storage_path()
+        event_file = os.path.join(storage_path, f"{meeting_name}.events")
+        
+        if not os.path.exists(event_file):
+            return
+
+        frappe.log_error(f"Applying speaker correlation from {event_file}", "Transcription Info")
+
+        # 2. Parse Events
+        events = []
+        try:
+            with open(event_file, "r") as f:
+                for line in f:
+                    parts = line.strip().split("|")
+                    if len(parts) >= 4:
+                        events.append({
+                            "time": float(parts[0]),
+                            "type": parts[1],
+                            "id": parts[2],
+                            "name": parts[3]
+                        })
+        except Exception as e:
+            frappe.log_error(f"Failed to parse event log: {e}", "Correlation Error")
+            return
+            
+        if not events:
+            return
+
+        # 3. Determine Audio Absolute Start Time
+        # Assumption: File Modification Time = End of Recording
+        # Start Time = MTime - Duration
+        stat = os.stat(audio_file)
+        # Use last segment end time as approximation of duration if not available
+        duration = transcript[-1]["end"] if transcript else 0
+        audio_end_epoch = stat.st_mtime
+        audio_start_epoch = audio_end_epoch - duration
+        
+        # 4. Map Segments
+        for item in transcript:
+            seg_start_epoch = audio_start_epoch + item["start"]
+            seg_end_epoch = audio_start_epoch + item["end"]
+            
+            # Find dominant speaker events overlapping this segment
+            # We look for "DOMINANT_SPEAKER" events that happened *before* or *during* this segment
+            # The "active" speaker is the last one declared dominant before the time check
+            
+            # Simple approach: Sample the middle of the segment
+            mid_epoch = (seg_start_epoch + seg_end_epoch) / 2
+            
+            # Find the last dominant speaker event before mid_epoch
+            active_speaker_name = None
+            last_event_time = 0
+            
+            for event in events:
+                if event["type"] == "DOMINANT_SPEAKER":
+                    if event["time"] <= mid_epoch:
+                        if event["time"] > last_event_time:
+                            active_speaker_name = event["name"]
+                            last_event_time = event["time"]
+            
+            if active_speaker_name and active_speaker_name != "Unknown":
+                # Prefix the diarization label if present, e.g. "Speaker 0 (Alpkan)"
+                # Or just replace it if we trust the log
+                base_label = item["speaker"]
+                if "Speaker" in base_label:
+                     item["speaker"] = active_speaker_name
+                else:
+                     item["speaker"] = f"{base_label} ({active_speaker_name})"
         
         elapsed = (datetime.now() - start_time).total_seconds()
         duration = transcript[-1]["end"] if transcript else 0
@@ -351,7 +433,7 @@ def process_transcription(audio_file: str, meeting_name: str, delete_after: bool
     """
     try:
         transcriber = JitsiTranscriber()
-        transcript = transcriber.transcribe(audio_file)
+        transcript = transcriber.transcribe(audio_file, meeting_name=meeting_name)
         
         # Calculate duration
         duration = transcript[-1]["end"] if transcript else 0

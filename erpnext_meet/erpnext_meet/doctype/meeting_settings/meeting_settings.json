@@ -218,6 +218,47 @@
             "fieldtype": "Data",
             "label": "Audio Storage Path",
             "description": "Leave empty for default: [app_path]/meeting_recordings"
+        },
+        {
+            "fieldname": "sb_speaker_detection",
+            "fieldtype": "Section Break",
+            "label": "Real-time Speaker Detection (Advanced)"
+        },
+        {
+            "default": "0",
+            "fieldname": "enable_speaker_detection",
+            "fieldtype": "Check",
+            "label": "Enable Speaker Logger",
+            "description": "Connects to Jitsi XMPP to log who is speaking when"
+        },
+        {
+            "default": "127.0.0.1",
+            "depends_on": "enable_speaker_detection",
+            "fieldname": "xmpp_server",
+            "fieldtype": "Data",
+            "label": "XMPP Server Host",
+            "description": "Jitsi Prosody server address (e.g. 127.0.0.1)"
+        },
+        {
+            "default": "5222",
+            "depends_on": "enable_speaker_detection",
+            "fieldname": "xmpp_port",
+            "fieldtype": "Int",
+            "label": "XMPP Port"
+        },
+        {
+            "depends_on": "enable_speaker_detection",
+            "fieldname": "xmpp_domain",
+            "fieldtype": "Data",
+            "label": "XMPP Auth Domain",
+            "description": "Internal auth domain (e.g. auth.meet.jitsi)"
+        },
+        {
+            "depends_on": "enable_speaker_detection",
+            "fieldname": "muc_domain",
+            "fieldtype": "Data",
+            "label": "MUC Components Domain",
+            "description": "Conference domain (e.g. conference.meet.jitsi)"
         }
     ],
     "issingle": 1,

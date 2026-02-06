@@ -199,6 +199,13 @@
             "label": "Transcription Status",
             "options": "None\nProcessing\nCompleted\nFailed",
             "read_only": 1
+        },
+        {
+            "fieldname": "logger_pid",
+            "fieldtype": "Int",
+            "label": "Logger PID",
+            "read_only": 1,
+            "hidden": 1
         }
     ],
     "issingle": 0,

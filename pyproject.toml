@@ -13,7 +13,8 @@ dependencies = [
     "faster-whisper",
     "python-docx",
     "reportlab",
-    "pydub"
+    "pydub",
+    "slixmpp"
 ]
 
 

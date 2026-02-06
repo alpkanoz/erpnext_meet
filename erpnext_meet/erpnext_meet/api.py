@@ -4,8 +4,15 @@ import frappe
 from frappe import _
 import jwt
 import time
+import frappe
+from frappe import _
+import jwt
+import time
 import uuid
 import os
+import sys
+import subprocess
+import signal
 
 @frappe.whitelist()
 def create_room(doctype, docname):
@@ -592,11 +599,92 @@ def end_meeting(room_name, status="Ended"):
         if meeting.event_ref and not meeting.repeat_this_meeting and status == "Ended":
             frappe.db.set_value("Event", meeting.event_ref, "status", "Completed")
         
+        # Stop Logger if running
+        stop_logger_service(meeting.name)
+
         frappe.db.commit()
         return True
     except Exception as e:
         frappe.log_error(f"Failed to end meeting: {str(e)}", "Meeting End Error")
         return False
+
+def start_logger_service(meeting_name):
+    """
+    Starts the speaker logger service for a meeting.
+    Generates filename: MeetingName - YYYY-MM-DD_HH-MM
+    """
+    settings = frappe.get_single("Meeting Settings")
+    if not settings.enable_speaker_detection:
+        return
+
+    try:
+        # Check if already running for this meeting to avoid duplicates
+        existing_pid = frappe.db.get_value("Meeting", meeting_name, "logger_pid")
+        if existing_pid and existing_pid > 0:
+            # Check if process really exists
+            try:
+                os.kill(existing_pid, 0)
+                return # Already running
+            except OSError:
+                pass # Stale PID
+
+        # Generate unique filename for this session
+        import datetime
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
+        # Format: MeetingName - YYYY-MM-DD_HH-MM.events
+        output_filename = f"{meeting_name} - {timestamp}"
+        
+        # Save filename to Meeting doc so we know which file to use later (optional, or just latest)
+        # Ideally we might need a field for 'current_session_log_file' if we want to be precise
+        
+        # App root for cwd
+        app_path = frappe.get_app_path("erpnext_meet")
+        cwd = os.path.dirname(app_path)
+        
+        cmd = [
+            sys.executable, 
+            "-m", 
+            "erpnext_meet.erpnext_meet.utils.jitsi_logger", 
+            frappe.local.site, 
+            meeting_name,
+            output_filename
+        ]
+        
+        process = subprocess.Popen(
+            cmd, 
+            cwd=cwd, 
+            stdout=subprocess.DEVNULL, 
+            stderr=subprocess.DEVNULL,
+            start_new_session=True
+        )
+        logger_pid = process.pid
+        
+        frappe.db.set_value("Meeting", meeting_name, "logger_pid", logger_pid)
+        flogged_msg = f"Started Speaker Logger (PID: {logger_pid}) -> {output_filename}"
+        frappe.log_error(flogged_msg, "Speaker Logger")
+        
+    except Exception as e:
+        frappe.log_error(f"Failed to start logger: {str(e)}", "Speaker Logger Error")
+
+def stop_logger_service(meeting_name):
+    """
+    Stops the speaker logger service for a meeting.
+    """
+    try:
+        m = frappe.db.get_value("Meeting", meeting_name, "logger_pid", as_dict=True)
+        if m and m.logger_pid:
+            try:
+                os.kill(m.logger_pid, signal.SIGTERM)
+                frappe.log_error(f"Stopped Speaker Logger (PID: {m.logger_pid})", "Speaker Logger")
+            except ProcessLookupError:
+                pass 
+            except Exception as ex:
+                frappe.log_error(f"Failed to kill logger: {str(ex)}", "Speaker Logger Error")
+            
+            # Reset PID
+            frappe.db.set_value("Meeting", meeting_name, "logger_pid", 0)
+    except Exception:
+        pass
 
 @frappe.whitelist()
 def start_meeting(room_name):
@@ -648,10 +736,34 @@ def handle_jitsi_event(**kwargs):
         # room_name format: Meet-{doctype}-{docname}-{session_id}
         # Webhook event means everyone left -> set to Waiting (for timeout)
         end_meeting(room_name, status="Waiting")
+        
+        # Stop Logger
+        try:
+            parts = room_name.rsplit("-", 1)
+            if len(parts) >= 2:
+                session_id = parts[1].split("?")[0]
+                meeting_name = frappe.db.get_value("Meeting", {"session_id": session_id})
+                if meeting_name:
+                    stop_logger_service(meeting_name)
+        except Exception:
+            pass
+            
         return {"status": "success", "message": f"Meeting ended for room {room_name}"}
     
     if event_type == "room_created" and room_name:
         start_meeting(room_name)
+        
+        # Start Logger
+        try:
+            parts = room_name.rsplit("-", 1)
+            if len(parts) >= 2:
+                session_id = parts[1].split("?")[0]
+                meeting_name = frappe.db.get_value("Meeting", {"session_id": session_id})
+                if meeting_name:
+                    start_logger_service(meeting_name)
+        except Exception:
+             pass
+             
         return {"status": "success", "message": f"Meeting started for room {room_name}"}
     
     return {"status": "ignored", "message": "Event not handled"}
