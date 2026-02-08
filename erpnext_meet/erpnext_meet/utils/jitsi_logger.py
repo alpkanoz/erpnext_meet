@@ -20,6 +20,10 @@ if __name__ == "__main__":
     meeting_name = sys.argv[2]
     output_filename = sys.argv[3]
     
+    # Change to sites directory so frappe can find the site
+    sites_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "..", "sites"))
+    os.chdir(sites_path)
+    
     frappe.init(site=site)
     frappe.connect()
 
@@ -164,7 +168,7 @@ def start_logger():
     xmpp.use_mechanisms = ["PLAIN"]
     
     # Connect
-    xmpp.connect(address=(xmpp_server, xmpp_port))
+    xmpp.connect(host=xmpp_server, port=xmpp_port)
     xmpp.process(forever=True)
 
 if __name__ == "__main__":

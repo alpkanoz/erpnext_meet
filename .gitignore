@@ -15,3 +15,12 @@ erpnext_meet/meeting_recordings/*.mp4
 erpnext_meet/meeting_recordings/*.webm
 erpnext_meet/meeting_recordings/*.ogg
 erpnext_meet/meeting_recordings/*.m4a
+jitsi-meet/
+
+# Test files
+test_transcription.py
+verify_install.py
+erpnext_meet/test_*.py
+
+# Event logs from speaker detection
+erpnext_meet/meeting_recordings/*.events
