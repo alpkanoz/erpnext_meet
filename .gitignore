@@ -14,3 +14,5 @@ test.py
 test_transcription.py
 *.pyc
 __pycache__/
+.env
+meeting_recordings
