@@ -7,3 +7,10 @@ node_modules
 __pycache__
 jitsi_config_sample
 .vscode
+jitsi-meet/
+jitsi-meet
+verify_install.py
+test.py
+test_transcription.py
+*.pyc
+__pycache__/
